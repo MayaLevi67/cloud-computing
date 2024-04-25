@@ -1,11 +1,19 @@
 import os
 import requests
-from flask import Flask, jsonify, request
+import json
+from flask import Flask, jsonify, request, Response
 
 app = Flask(__name__)
 DEFAULT_PORT = 8000
 port = int(os.getenv('PORT', DEFAULT_PORT))
 
+def custom_jsonify(data):
+    try:
+        response_data = json.dumps(data, ensure_ascii=False)
+        return Response(response_data, mimetype='application/json; charset=utf-8')
+    except Exception as e:
+        return Response(json.dumps({"error": "Failed to serialize data to JSON", "details": str(e)}),
+                        mimetype='application/json; charset=utf-8'), 500
 
 # dummy in-memory 'database'
 books = []
@@ -63,10 +71,8 @@ def add_book():
 @app.route('/books/<book_id>', methods=['GET'])
 def get_book(book_id):
     book = next((book for book in books if book['id'] == book_id), None)
-    if book is not None:
-        return jsonify(book)
-    else:
-        return jsonify({"message": "Book not found"}), 404
+    return custom_jsonify(book) if book is not None else (custom_jsonify({"message": "Book not found"}), 404)
+
     
 
 @app.route('/books', methods=['GET'])
@@ -103,7 +109,7 @@ def get_books():
             }
             filtered_books.append(formatted_book)
     
-    return jsonify(filtered_books)
+    return custom_jsonify(filtered_books)
 
 
 @app.route('/books/<book_id>', methods=['PUT'])
