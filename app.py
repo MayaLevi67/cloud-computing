@@ -1,3 +1,4 @@
+import datetime
 import os
 import requests
 from flask import Flask, jsonify, request
@@ -15,6 +16,12 @@ from flask import abort
 
 @app.route('/books', methods=['POST'])
 def add_book():
+    expected_fields = {'ISBN', 'title', 'genre'}
+    received_fields = set(request.json.keys())
+
+    if received_fields != expected_fields:
+        return jsonify({"error": "Only ISBN, title, and genre fields must be provided"}), 400
+
     isbn = request.json.get('ISBN')
     title = request.json.get('title')
     genre = request.json.get('genre')
@@ -25,17 +32,18 @@ def add_book():
     
     google_books_url = f'https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}&key=AIzaSyAOu8Qh7n9dRTamVGyhlmpVR6si6OT2QXk'
     response = requests.get(google_books_url)
+
     try:
         google_books_data = response.json()['items'][0]['volumeInfo']
     except (IndexError, KeyError):
-        return jsonify({"error": "No items returned from Google Book API for given ISBN number"}), 400
+        return jsonify({"error": "Invalid ISBN number; not found in Google Books API"}), 422
     
     authors = google_books_data.get("authors", ["missing"])
     publisher = google_books_data.get("publisher", ["missing"])
-    publishedDate = google_books_data.get("publishedDate", "missing")
     language = google_books_data.get("language", ["missing"])
     summary = google_books_data.get("summary", "missing")
-    
+    publishedDate = google_books_data.get("publishedDate", "missing")
+
     new_id = str(len(books) + 1)  
     book = {
         "id": new_id,
@@ -49,13 +57,7 @@ def add_book():
         "summary": summary
     }
     books.append(book)
-    
-    ratings.append({
-        "id": new_id,
-        "title": book["title"],
-        "values": [],
-        "average": 0.0
-    })
+    ratings.append({"id": new_id, "title": title, "values": [], "average": 0.0})
 
     return jsonify(book), 201
 
@@ -71,22 +73,25 @@ def get_book(book_id):
 
 @app.route('/books', methods=['GET'])
 def get_books():
+    valid_languages = {'heb', 'eng', 'spa', 'chi'}
     query_params = request.args
 
     filtered_books = []
     for book in books:
         matches_query = True
         for key, value in query_params.items():
-            if key.startswith('language contains'):
-                language = key.split()[-1]
-                if language not in book.get('language', []):
+            # Special handling for 'language'
+            if key == 'language':
+                # Validate that the language value is one of the allowed options
+                if value not in valid_languages:
+                    return jsonify({"error": f"Invalid language. Must be one of {list(valid_languages)}."}), 400
+                # Check if the specified language is included in the book's languages
+                if value not in book.get('language', []):
                     matches_query = False
                     break
-            elif key == 'authors':
-                if not any(value.lower() == author.lower() for author in book.get(key, [])):
-                    matches_query = False
-                    break
-            elif key in book and key not in ['summary', 'language'] and str(book.get(key, '')).lower() != value.lower():
+            elif key in ['summary', 'language']:  # Skip summary and direct filtering on 'language' list
+                continue
+            elif key in book and str(book.get(key, '')).lower() != value.lower():
                 matches_query = False
                 break
         if matches_query:
@@ -104,6 +109,7 @@ def get_books():
             filtered_books.append(formatted_book)
     
     return jsonify(filtered_books)
+
 
 
 @app.route('/books/<book_id>', methods=['PUT'])
