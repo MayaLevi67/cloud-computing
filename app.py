@@ -214,36 +214,33 @@ def add_rating(book_id):
     return jsonify({"new_average_rating": rating_entry['average']})
 
 
-#TOOD - check if it works good
 @app.route('/top', methods=['GET'])
 def get_top_books():
     book_ratings = {book['id']: [] for book in books}
-
     
     for rating in ratings:
-        book_ratings[rating['book_id']].append(rating['rating'])
+        book_ratings[rating['id']].extend(rating['values'])
 
-    # filter books with at least 3 ratings and calculate average ratings
     avg_ratings = [
-        {"book_id": book_id, "average_rating": sum(book_ratings) / len(book_ratings)}
-        for book_id, book_ratings in book_ratings.items() if len(book_ratings) >= 3
+        {"book_id": book_id, "average_rating": sum(book_ratings[book_id]) / len(book_ratings[book_id])}
+        for book_id in book_ratings if len(book_ratings[book_id]) >= 3
     ]
 
-    # sort by average rating, then by id to ensure a consistent order for books with the same rating
     avg_ratings.sort(key=lambda x: (-x["average_rating"], x["book_id"]))
 
-    # determine the cut-off average rating for the top books (the 3rd highest average rating)
-    # but include all books that share this rating
     if len(avg_ratings) >= 3:
         cutoff_average = sorted(set(x["average_rating"] for x in avg_ratings), reverse=True)[2]
     else:
-        cutoff_average = float('-inf')  # if less than 3 books have ratings, include all
+        cutoff_average = float('-inf')
 
     top_books_details = [
-        {"id": book["id"], "title": book["title"], "average": avg_rating["average_rating"]}
-        for avg_rating in avg_ratings
-        for book in books
-        if book["id"] == avg_rating["book_id"] and avg_rating["average_rating"] >= cutoff_average
+        {
+            "id": book["id"],
+            "title": book["title"],
+            "average": avg_rating["average_rating"]
+        }
+        for avg_rating in avg_ratings if avg_rating["average_rating"] >= cutoff_average
+        for book in books if book["id"] == avg_rating["book_id"]
     ]
 
     return jsonify(top_books_details)
