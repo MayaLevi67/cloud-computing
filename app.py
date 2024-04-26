@@ -3,6 +3,7 @@ import os
 import json
 import requests
 from flask import Flask, Response, jsonify, request
+from werkzeug.exceptions import UnsupportedMediaType
 
 app = Flask(__name__)
 DEFAULT_PORT = 8000
@@ -25,25 +26,35 @@ from flask import abort
 
 @app.route('/books', methods=['POST'])
 def add_book():
+    if request.content_type != 'application/json':
+        return jsonify({"error": "Unsupported media type. Expected application/json."}), 415
+
+    try:
+        data = request.get_json()
+    except:
+        return jsonify({"error": "Invalid JSON data."}), 400
+
     expected_fields = {'ISBN', 'title', 'genre'}
-    received_fields = set(request.json.keys())
+    received_fields = set(data.keys())
 
     if received_fields != expected_fields:
-        return jsonify({"error": "Only ISBN, title, and genre fields must be provided"}), 400
+        return jsonify({"error": "ISBN, title, and genre fields (and only them) must be provided"}), 422
 
-    isbn = request.json.get('ISBN')
-    title = request.json.get('title')
-    genre = request.json.get('genre')
-    
+    isbn = data.get('ISBN')
+    title = data.get('title')
+    genre = data.get('genre')
+
     existing_book = next((book for book in books if book['ISBN'] == isbn), None)
     if existing_book:
         return jsonify({"error": "A book with this ISBN already exists"}), 422
     
-    google_books_url = f'https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}&key=AIzaSyAOu8Qh7n9dRTamVGyhlmpVR6si6OT2QXk'
-    response = requests.get(google_books_url)
-
+    google_books_url = f'https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}'
     try:
+        response = requests.get(google_books_url)
+        response.raise_for_status()  
         google_books_data = response.json()['items'][0]['volumeInfo']
+    except requests.exceptions.HTTPError as e:
+        return jsonify({"error": f"Unable to connect to Google service", "details": str(e)}), 500
     except (IndexError, KeyError):
         return jsonify({"error": "Invalid ISBN number; not found in Google Books API"}), 422
     
@@ -68,7 +79,7 @@ def add_book():
     books.append(book)
     ratings.append({"id": new_id, "title": title, "values": [], "average": 0.0})
 
-    return custom_jsonify(book), 201
+    return jsonify(book), 201
 
 
 @app.route('/books/<book_id>', methods=['GET'])
@@ -184,15 +195,25 @@ def get_book_ratings(book_id):
 
 @app.route('/ratings/<book_id>/values', methods=['POST'])
 def add_rating(book_id):
-    new_rating = request.json.get('value')
-    if new_rating not in {1, 2, 3, 4, 5}:
-        return jsonify({"message": "Invalid rating value. Must be an integer between 1 and 5."}), 400
-    rating_entry = next((rating for rating in ratings if rating['id'] == book_id), None)
-    if not rating_entry:
-        return jsonify({"message": "Book not found"}), 404
-    rating_entry['values'].append(new_rating)
-    rating_entry['average'] = round(sum(rating_entry['values']) / len(rating_entry['values']), 2)
-    return jsonify({"new_average_rating": rating_entry['average']})
+    if request.content_type != 'application/json':
+        return jsonify({"error": "Unsupported media type. Expected application/json."}), 415
+
+    try:
+        data = request.get_json()
+        new_rating = data.get('value')
+        if new_rating not in {1, 2, 3, 4, 5}:
+            return jsonify({"error": "Invalid rating value. Must be an integer between 1 and 5."}), 422
+        
+        rating_entry = next((rating for rating in ratings if rating['id'] == book_id), None)
+        if not rating_entry:
+            return jsonify({"error": "Book not found"}), 404
+        
+        rating_entry['values'].append(new_rating)
+        rating_entry['average'] = round(sum(rating_entry['values']) / len(rating_entry['values']), 2)
+        
+        return jsonify({"new_average_rating": rating_entry['average']})
+    except TypeError:
+        return jsonify({"error": "Provided data is not correctly formatted"}), 422
 
 
 @app.route('/top', methods=['GET'])
