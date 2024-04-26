@@ -145,43 +145,24 @@ def delete_book(book_id):
         return jsonify({"message": "Book and its ratings deleted"}),200
     else:
         return jsonify({"message": "Book not found"}), 404
-    
+
+
 @app.route('/ratings', methods=['GET'])
 def get_ratings():
     query_id = request.args.get('id')
-    query_average = request.args.get('average')
-    op = None
-    value = None
-
-    if query_average:
-        for symbol in ['<', '<=', '=', '>', '>=']:
-            if symbol in query_average:
-                op, value = query_average.split(symbol, 1)
-                value = float(value)  
-                break
 
     filtered_ratings = []
     for rating in ratings:
         if query_id and rating['id'] != query_id:
             continue
 
-        if query_average and op and value is not None:
-            comparison_result = False
-            if op == '<':
-                comparison_result = rating['average'] < value
-            elif op == '<=':
-                comparison_result = rating['average'] <= value
-            elif op == '=':
-                comparison_result = rating['average'] == value
-            elif op == '>':
-                comparison_result = rating['average'] > value
-            elif op == '>=':
-                comparison_result = rating['average'] >= value
-
-            if not comparison_result:
-                continue
-
-        filtered_ratings.append(rating)
+        # Append the rating details
+        filtered_ratings.append({
+            'id': rating['id'],
+            'title': rating['title'],
+            'values': rating['values'],
+            'average': rating['average']
+        })
 
     return jsonify(filtered_ratings)
 
@@ -216,31 +197,22 @@ def add_rating(book_id):
 
 @app.route('/top', methods=['GET'])
 def get_top_books():
-    book_ratings = {book['id']: [] for book in books}
+    eligible_books = [rating for rating in ratings if len(rating['values']) >= 3]
     
-    for rating in ratings:
-        book_ratings[rating['id']].extend(rating['values'])
+    eligible_books.sort(key=lambda x: (-x['average'], x['id']))
 
-    avg_ratings = [
-        {"book_id": book_id, "average_rating": sum(book_ratings[book_id]) / len(book_ratings[book_id])}
-        for book_id in book_ratings if len(book_ratings[book_id]) >= 3
-    ]
-
-    avg_ratings.sort(key=lambda x: (-x["average_rating"], x["book_id"]))
-
-    if len(avg_ratings) >= 3:
-        cutoff_average = sorted(set(x["average_rating"] for x in avg_ratings), reverse=True)[2]
+    if len(eligible_books) >= 3:
+        cutoff_average = sorted(set(book['average'] for book in eligible_books), reverse=True)[2]
     else:
-        cutoff_average = float('-inf')
+        cutoff_average = float('-inf')  
 
     top_books_details = [
         {
             "id": book["id"],
             "title": book["title"],
-            "average": avg_rating["average_rating"]
+            "average": book["average"]
         }
-        for avg_rating in avg_ratings if avg_rating["average_rating"] >= cutoff_average
-        for book in books if book["id"] == avg_rating["book_id"]
+        for book in eligible_books if book["average"] >= cutoff_average
     ]
 
     return jsonify(top_books_details)
