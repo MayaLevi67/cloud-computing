@@ -3,7 +3,6 @@ import os
 import json
 import requests
 from flask import Flask, Response, jsonify, request
-from werkzeug.exceptions import UnsupportedMediaType
 
 app = Flask(__name__)
 DEFAULT_PORT = 8000
@@ -128,22 +127,31 @@ def get_books():
     return custom_jsonify(filtered_books)
 
 
+#TODO - is there a need to validate the language from the list allowed? the length of the new ISBM ? 
+#TODO - how to take care of the publishDate??
 @app.route('/books/<book_id>', methods=['PUT'])
 def update_book(book_id):
-    required_fields = ['ISBN', 'title', 'genre', 'authors', 'publisher', 'publishedDate', 'language', 'summary']
+    if request.content_type != 'application/json':
+        return jsonify({"error": "Unsupported media type. Expected application/json."}), 415
+
     book = next((book for book in books if book['id'] == book_id), None)
     if not book:
-        return jsonify({"message": "Book not found"}), 404
+        return jsonify({"error": "Book not found"}), 404
+    updated_data = request.get_json()
     
-    updated_data = request.json
+    required_fields = ['ISBN', 'title', 'genre', 'authors', 'publisher', 'publishedDate', 'language', 'summary']
+    
     if not all(field in updated_data for field in required_fields):
-        return jsonify({"error": "All fields must be provided"}), 400
+        return jsonify({"error": "All fields must be provided"}), 422
+
+    accepted_genres = ['Fiction', 'Children', 'Biography', 'Science', 'Science Fiction', 'Fantasy', 'Other']
+    if updated_data['genre'] not in accepted_genres:
+        return jsonify({"error": "Genre is not one of the accepted values"}), 422
 
     for field in required_fields:
         book[field] = updated_data[field]
 
     return jsonify({"id": book_id}), 200
-
 
 
 @app.route('/books/<book_id>', methods=['DELETE'])
