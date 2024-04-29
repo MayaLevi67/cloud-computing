@@ -19,7 +19,7 @@ def route_get_book(book_id):
 
 @book_routes.route('/books', methods=['GET'])
 def route_get_books():
-    return get_books(request.args)
+    return get_books(request.args) 
 
 @book_routes.route('/books/<book_id>', methods=['PUT'])
 def route_update_book(book_id):

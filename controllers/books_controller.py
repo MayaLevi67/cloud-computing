@@ -52,14 +52,14 @@ def get_book(book_id):
 
 #TODO - languages do not filtered good
 def get_books(query_params):
-    valid_languages = {'heb', 'eng', 'spa', 'chi'}
+    valid_languages = {"heb", 'eng', 'spa', 'chi'}
     filtered_books = []
     for book in books:
         matches_query = True
         for key, value in query_params.items():
             if key == 'language':
                 if value not in valid_languages:
-                    return jsonify({"error": f"Invalid language. Must be one of {list(valid_languages)}."}), 400
+                    return jsonify({"error": f"Invalid language request. Must be one of {list(valid_languages)}."}), 400
                 if value not in book.language:
                     matches_query = False
                     break
@@ -70,10 +70,10 @@ def get_books(query_params):
                 break
         if matches_query:
             filtered_books.append(book.to_dict())
-    return custom_jsonify(filtered_books)
+    return custom_jsonify(filtered_books), 200
+
 
 #TODO - how to take care of the publishDate??
-
 def update_book(book_id, updated_data):
     book = next((book for book in books if book.id == book_id), None)
     if not book:
@@ -105,3 +105,4 @@ def delete_book(book_id):
     books = [b for b in books if b.id != book_id]
     ratings = [r for r in ratings if r.id != book_id]
     return jsonify({"message": "Book and its ratings deleted"}), 200
+
