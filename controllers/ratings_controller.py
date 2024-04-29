@@ -27,7 +27,6 @@ def add_rating(book_id, value):
     return jsonify({"new_average_rating": rating_entry.average}), 201
 
 
-
 #TODO - not working good - why ? 
 def get_top_books():
     eligible_books = [rating for rating in ratings if len(rating['values']) >= 3]
