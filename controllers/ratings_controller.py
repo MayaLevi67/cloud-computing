@@ -1,5 +1,7 @@
 from flask import jsonify
 from data.database import ratings
+from flask import jsonify, current_app as app
+
 
 def get_ratings(query_id=None):
     filtered_ratings = [rating.to_dict() for rating in ratings if not query_id or rating.id == query_id]
@@ -28,23 +30,22 @@ def add_rating(book_id, value):
 
 
 #TODO - not working good - why ? 
-def get_top_books():
-    eligible_books = [rating for rating in ratings if len(rating['values']) >= 3]
-    
-    eligible_books.sort(key=lambda x: (-x['average'], x['id']))
+def get_top_books(ratings):
+    try:
+        app.logger.info(f"Total ratings: {len(ratings)}")
+        eligible_books = [rating for rating in ratings if len(rating.values) >= 3]
+        app.logger.info(f"Eligible books: {len(eligible_books)}")
 
-    if len(eligible_books) >= 3:
-        cutoff_average = sorted(set(book['average'] for book in eligible_books), reverse=True)[2]
-    else:
-        cutoff_average = float('-inf')  
+        if not eligible_books:
+            app.logger.info("No eligible books found with at least 3 ratings.")
 
-    top_books_details = [
-        {
-            "id": book["id"],
-            "title": book["title"],
-            "average": book["average"]
-        }
-        for book in eligible_books if book["average"] >= cutoff_average
-    ]
+        sorted_books = sorted(eligible_books, key=lambda x: x.average, reverse=True)
+        sorted_books_dicts = [book.to_dict() for book in sorted_books]
+        app.logger.info('Top books calculated successfully.')
+        return jsonify(sorted_books_dicts)
 
-    return jsonify(top_books_details), 200
+    except Exception as e:
+        app.logger.error(f"Failed to retrieve top books: {str(e)}")
+        raise
+
+
