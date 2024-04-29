@@ -1,3 +1,4 @@
+from data.database import ratings  # Ensure this import is correct
 from flask import Blueprint, jsonify, request
 from controllers.ratings_controller import get_ratings, get_book_ratings, add_rating, get_top_books
 
@@ -25,5 +26,9 @@ def route_add_rating(book_id):
     return add_rating(book_id, new_rating)
 
 @rating_routes.route('/top', methods=['GET'])
-def route_get_top_books():
-    return get_top_books()
+def top_books():
+    try:
+        return get_top_books(ratings)
+    except Exception as e:
+        app.logger.error(f"Unhandled error in top_books: {str(e)}")
+        return jsonify({'error': 'Internal Server Error', 'message': str(e)}), 500
