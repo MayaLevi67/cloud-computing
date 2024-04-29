@@ -5,6 +5,13 @@ from models.book import Book
 from models.rating import Rating
 from util.jsonify_tools import custom_jsonify
 
+import requests
+import google.generativeai as genai
+import os
+
+# Initialize the generative AI configuration
+genai.configure(api_key=os.environ.get('AIzaSyASObTvV83kcMUvHVqOw3QIxXhPkUCuVPE'))
+
 def add_book(data):
     expected_fields = {'ISBN', 'title', 'genre'}
     received_fields = set(data.keys())
@@ -16,31 +23,65 @@ def add_book(data):
     title = data['title']
     genre = data['genre']
 
+    # Check if the book already exists
     existing_book = next((book for book in books if book.ISBN == isbn), None)
     if existing_book:
         return jsonify({"error": "A book with this ISBN already exists"}), 422
-    
-    google_books_url = f'https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}&key=AIzaSyAOu8Qh7n9dRTamVGyhlmpVR6si6OT2QXk'
+
+    # Fetch data from Google Books API
+    google_books_url = f'https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}'
     try:
         response = requests.get(google_books_url)
         response.raise_for_status()
         google_books_data = response.json()['items'][0]['volumeInfo']
     except requests.exceptions.HTTPError as e:
-        return jsonify({"error": f"Unable to connect to Google service", "details": str(e)}), 500
+        return jsonify({"error": f"Unable to connect to Google Books API", "details": str(e)}), 500
     except (IndexError, KeyError):
         return jsonify({"error": "Invalid ISBN number; not found in Google Books API"}), 422
 
-    authors = google_books_data.get("authors", ["missing"])
-    publisher = google_books_data.get("publisher", ["missing"])
-    language = google_books_data.get("language", ["missing"])
-    summary = google_books_data.get("summary", "missing")
-    publishedDate = google_books_data.get("publishedDate", "missing")
+    authors_list = google_books_data.get('authors', ["missing"])
+    authors = " and ".join(authors_list)
+    publisher = google_books_data.get("publisher", "missing")
+    published_date = google_books_data.get("publishedDate", "missing")
 
+    #TODO - change
+    if len(published_date) == 4:
+        published_date = published_date
+
+    # Fetch data from OpenLibrary API
+    open_library_url = f'https://openlibrary.org/search.json?q={isbn}&fields=key,title,author_name,language'
+    try:
+        open_lib_response = requests.get(open_library_url)
+        open_lib_response.raise_for_status()
+        open_lib_data = open_lib_response.json().get('docs', [])
+        if not open_lib_data:
+            raise ValueError("No information available from OpenLibrary.")
+    except (requests.exceptions.HTTPError, ValueError) as e:
+        return jsonify({"error": f"Unable to retrieve information from OpenLibrary", "details": str(e)}), 422
+
+    language = open_lib_data[0].get("language", ["missing"])
+    if not language:
+        language = ["missing"]
+
+    # Fetch summary using Google Gemini API
+    model = genai.GenerativeModel('gemini-pro')
+    prompt = f'Summarize the book "{title}" by {authors} in 5 sentences or less.'
+    try:
+        llm_response = model.generate_content(prompt)
+        summary = llm_response.text if llm_response else "missing"
+    except Exception as e:
+        summary = "missing"
+
+    # Create and add the new book
     new_id = str(len(books) + 1)
-    new_book = Book(new_id, isbn, title, genre, authors, publisher, publishedDate, language, summary)
+    new_book = Book(new_id, isbn, title, genre, authors, publisher, published_date, language, summary)
     books.append(new_book)
+
     ratings.append(Rating(new_id, title))
+
     return custom_jsonify(new_book.to_dict()), 201
+
+
 
 def get_book(book_id):
     book = next((book for book in books if book.id == book_id), None)
