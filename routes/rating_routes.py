@@ -1,5 +1,5 @@
 from data.database import ratings  # Ensure this import is correct
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, app, jsonify, request
 from controllers.ratings_controller import get_ratings, get_book_ratings, add_rating, get_top_books
 
 rating_routes = Blueprint('rating_routes', __name__)

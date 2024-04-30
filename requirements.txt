@@ -13,3 +13,4 @@ urllib3==2.2.1
 Werkzeug==3.0.2
 zipp==3.18.1
 google-generativeai
+python-dotenv==1.0.1
