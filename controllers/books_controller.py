@@ -47,56 +47,41 @@ def add_book(data):
     published_date = google_books_data.get("publishedDate", "missing")
     if published_date != "missing":
         valid_date_formats = [
-        r"^\d{4}$",  # YYYY
-        r"^\d{4}-\d{2}-\d{2}$",  # YYYY-MM-DD
+        r"^\d{4}$", # YYYY
+        r"^\d{4}-\d{2}-\d{2}$", # YYYY-MM-DD
     ]
     
     if not any(re.match(pattern, published_date) for pattern in valid_date_formats):
         published_date = "missing"
 
-    # Fetch data from OpenLibrary API
+    # fetch data from OpenLibrary API
     open_library_url = f'https://openlibrary.org/search.json?q={isbn}&fields=key,title,author_name,language'
     try:
         open_lib_response = requests.get(open_library_url)
         open_lib_response.raise_for_status()
         open_lib_data = open_lib_response.json().get('docs', [])
+        
         if not open_lib_data:
-            raise ValueError("No information available from OpenLibrary.")
-    except (requests.exceptions.HTTPError, ValueError) as e:
-        return jsonify({"error": f"Unable to retrieve information from OpenLibrary", "details": str(e)}), 422
-
-    language = open_lib_data[0].get("language", ["missing"])
-    if not language:
+            language = ["missing"]
+        else:
+            language = open_lib_data[0].get("language", ["missing"])
+    except (requests.exceptions.HTTPError, ValueError):
         language = ["missing"]
 
     # Fetch summary using Google Gemini API
-    model = genai.GenerativeModel('gemini-pro', 
-                                  safety_settings=[
-            {
-                "category": "HARM_CATEGORY_DANGEROUS",
-                "threshold": "BLOCK_NONE",
-            },
-            {
-                "category": "HARM_CATEGORY_HARASSMENT",
-                "threshold": "BLOCK_NONE",
-            },
-            {
-                "category": "HARM_CATEGORY_HATE_SPEECH",
-                "threshold": "BLOCK_NONE",
-            },
-            {
-                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                "threshold": "BLOCK_NONE",
-            },
-            {
-                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                "threshold": "BLOCK_NONE",
-            },
-        ])
-    
+    prompt = f'Summarize the book "{title}" by {authors} in 5 sentences or less. If you don\'t know the book, return the word "missing" and only this word."'
 
-    prompt = f'Summarize the book "{title}" by {authors} in 5 sentences or less. If you dont know the book, return the word "missing" and only this word'
     try:
+        model = genai.GenerativeModel('gemini-pro', 
+            safety_settings=[
+                {"category": "HARM_CATEGORY_DANGEROUS", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+            ]
+        )
+
         llm_response = model.generate_content(prompt)
         summary = llm_response.text if llm_response else "missing"
     except Exception as e:
@@ -143,7 +128,6 @@ def get_books(query_params):
     return custom_jsonify(filtered_books), 200
 
 
-#TODO - how to take care of the publishDate??
 def update_book(book_id, updated_data):
     book = next((book for book in books if book.id == book_id), None)
     if not book:
@@ -157,21 +141,17 @@ def update_book(book_id, updated_data):
     if updated_data['genre'] not in accepted_genres:
         return jsonify({"error": "Genre is not one of the accepted values"}), 422
     
-    #TODO - check with yonatan if we need to consider possible days and month of the year
     published_date = updated_data.get("publishedDate", "missing")
 
     if published_date != "missing":
-        # Check for valid formats
         valid_date_formats = [
             r"^\d{4}$",  # YYYY
             r"^\d{4}-\d{2}-\d{2}$",  # YYYY-MM-DD
         ]
         
-        # Check if published_date matches any valid format
         if not any(re.match(pattern, published_date) for pattern in valid_date_formats):
             published_date = "missing"
     
-    # Update the book data
     updated_data["publishedDate"] = published_date
     
     if any(other_book for other_book in books if other_book.ISBN == updated_data['ISBN'] and other_book.id != book_id):
