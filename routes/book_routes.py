@@ -6,7 +6,7 @@ book_routes = Blueprint('book_routes', __name__)
 @book_routes.route('/books', methods=['POST'])
 def route_add_book():
     if request.content_type != 'application/json':
-        return jsonify({"error": "Unsupported media type. Expected application/json."}), 415
+        return jsonify({"error": "Unsupported media type"}), 415
     try:
         data = request.get_json()
     except:
@@ -24,7 +24,7 @@ def route_get_books():
 @book_routes.route('/books/<book_id>', methods=['PUT'])
 def route_update_book(book_id):
     if request.content_type != 'application/json':
-        return jsonify({"error": "Unsupported media type. Expected application/json."}), 415
+        return jsonify({"error": "Unsupported media type"}), 415
     try:
         updated_data = request.get_json()
     except:

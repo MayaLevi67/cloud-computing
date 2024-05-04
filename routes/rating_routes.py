@@ -1,4 +1,4 @@
-from data.database import ratings  # Ensure this import is correct
+from data.database import ratings
 from flask import Blueprint, app, jsonify, request
 from controllers.ratings_controller import get_ratings, get_book_ratings, add_rating, get_top_books
 
@@ -16,13 +16,11 @@ def route_get_book_ratings(book_id):
 @rating_routes.route('/ratings/<book_id>/values', methods=['POST'])
 def route_add_rating(book_id):
     if request.content_type != 'application/json':
-        return jsonify({"error": "Unsupported media type. Expected application/json."}), 415
-    try:
-        data = request.get_json()
-    except:
-        return jsonify({"error": "Invalid JSON data."}), 400
-
+        return jsonify({"error": "Unsupported media type"}), 415
+    
+    data = request.get_json()
     new_rating = data.get('value')
+    
     return add_rating(book_id, new_rating)
 
 @rating_routes.route('/top', methods=['GET'])

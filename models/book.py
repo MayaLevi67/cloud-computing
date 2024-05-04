@@ -22,5 +22,3 @@ class Book:
             "language": self.language,
             "summary": self.summary
         }
-    
-    #TODO - why not return vars(self)?

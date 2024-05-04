@@ -41,7 +41,7 @@ def add_book(data):
         response.raise_for_status()
         google_books_data = response.json()['items'][0]['volumeInfo']
     except requests.exceptions.HTTPError as e:
-        return jsonify({"error": f"Unable to connect to Google Books API", "details": str(e)}), 500
+        return jsonify({"error": f"Unable to connect to Google Books API"}), 500
     except (IndexError, KeyError):
         return jsonify({"error": "Invalid ISBN number; not found in Google Books API"}), 422
 
@@ -89,7 +89,7 @@ def add_book(data):
         llm_response = model.generate_content(prompt)
         summary = llm_response.text if llm_response else "missing"
     except Exception as e:
-        summary = "missing"
+        return jsonify({"error": "Unable to connect to Gemini"}), 500
 
     # create and add the new book
     new_id = str(len(books) + 1)
@@ -98,7 +98,7 @@ def add_book(data):
 
     ratings.append(Rating(new_id, title))
 
-    return custom_jsonify(new_book.to_dict()), 201
+    return jsonify({"id": new_id}), 201
 
 
 def get_book(book_id):
@@ -109,7 +109,6 @@ def get_book(book_id):
         return custom_jsonify({"message": "Book not found"}), 404
 
 
-#TODO - check functionallity after fixing languages query issue
 def get_books(query_params):
     valid_languages = {'heb', 'eng', 'spa', 'chi'}
     filtered_books = []
@@ -176,7 +175,8 @@ def delete_book(book_id):
     if not book:
         return jsonify({"message": "Book not found"}), 404
     
-    books = [b for b in books if b.id != book_id]
     ratings = [r for r in ratings if r.id != book_id]
-    return jsonify({"message": "Book and its ratings deleted"}), 200
+    books = [b for b in books if b.id != book_id]
+
+    return jsonify({"id": book_id}), 200
 
