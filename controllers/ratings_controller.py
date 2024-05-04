@@ -29,7 +29,6 @@ def add_rating(book_id, value):
     return jsonify({"new_average_rating": rating_entry.average}), 201
 
 
-#TODO - not working good - why ? 
 def get_top_books(ratings):
     try:
         app.logger.info(f"Total ratings: {len(ratings)}")
@@ -47,5 +46,6 @@ def get_top_books(ratings):
     except Exception as e:
         app.logger.error(f"Failed to retrieve top books: {str(e)}")
         raise
+
 
 

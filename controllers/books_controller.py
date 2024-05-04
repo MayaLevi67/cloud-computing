@@ -25,6 +25,10 @@ def add_book(data):
     title = data['title']
     genre = data['genre']
 
+    valid_genres = ['Fiction', 'Children', 'Biography', 'Science', 'Science Fiction', 'Fantasy', 'Other']
+    if genre not in valid_genres:
+        return jsonify({"error": "Invalid genre; acceptable genres are Fiction, Children, Biography, Science, Science Fiction, Fantasy, Other"}), 422
+
     # Check if the book already exists
     existing_book = next((book for book in books if book.ISBN == isbn), None)
     if existing_book:
@@ -68,7 +72,7 @@ def add_book(data):
     except (requests.exceptions.HTTPError, ValueError):
         language = ["missing"]
 
-    # Fetch summary using Google Gemini API
+    # fetch summary using Google Gemini API
     prompt = f'Summarize the book "{title}" by {authors} in 5 sentences or less. If you don\'t know the book, return the word "missing" and only this word."'
 
     try:
@@ -105,7 +109,7 @@ def get_book(book_id):
         return custom_jsonify({"message": "Book not found"}), 404
 
 
-#TODO - languages do not filtered good
+#TODO - check functionallity after fixing languages query issue
 def get_books(query_params):
     valid_languages = {'heb', 'eng', 'spa', 'chi'}
     filtered_books = []
@@ -115,17 +119,20 @@ def get_books(query_params):
             if key == 'language':
                 if value not in valid_languages:
                     return jsonify({"error": f"Invalid language request. Must be one of {list(valid_languages)}."}), 400
-                if value not in book.language:
+                # Ensure that the language check works correctly with a list of languages
+                if not any(value.lower() == lang.lower() for lang in book.language):
                     matches_query = False
                     break
-            if key == 'summery':
-                break
-            if key in book.to_dict() and str(getattr(book, key, '')).lower() != value.lower():
+            # Exclude 'summery' field from the query filtering as per instructions
+            elif key == 'summery':
+                continue
+            # Generic handling for other fields
+            elif str(getattr(book, key, '')).lower() != value.lower():
                 matches_query = False
                 break
         if matches_query:
             filtered_books.append(book.to_dict())
-    return custom_jsonify(filtered_books), 200
+    return jsonify(filtered_books), 200
 
 
 def update_book(book_id, updated_data):
@@ -139,7 +146,7 @@ def update_book(book_id, updated_data):
 
     accepted_genres = ['Fiction', 'Children', 'Biography', 'Science', 'Science Fiction', 'Fantasy', 'Other']
     if updated_data['genre'] not in accepted_genres:
-        return jsonify({"error": "Genre is not one of the accepted values"}), 422
+        return jsonify({"error": "Invalid genre; acceptable genres are Fiction, Children, Biography, Science, Science Fiction, Fantasy, Other"}), 422
     
     published_date = updated_data.get("publishedDate", "missing")
 
