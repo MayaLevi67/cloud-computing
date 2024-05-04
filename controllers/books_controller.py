@@ -13,6 +13,7 @@ import os
 # initialize the generative AI configuration
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_KEY"))
+current_max_id = 0
 
 def add_book(data):
     expected_fields = {'ISBN', 'title', 'genre'}
@@ -59,18 +60,19 @@ def add_book(data):
         published_date = "missing"
 
     # fetch data from OpenLibrary API
-    open_library_url = f'https://openlibrary.org/search.json?q={isbn}&fields=key,title,author_name,language'
-    try:
-        open_lib_response = requests.get(open_library_url)
-        open_lib_response.raise_for_status()
-        open_lib_data = open_lib_response.json().get('docs', [])
+    language = ["missing"]
+    # open_library_url = f'https://openlibrary.org/search.json?q={isbn}&fields=key,title,author_name,language'
+    # try:
+    #     open_lib_response = requests.get(open_library_url)
+    #     open_lib_response.raise_for_status()
+    #     open_lib_data = open_lib_response.json().get('docs', [])
         
-        if not open_lib_data:
-            language = ["missing"]
-        else:
-            language = open_lib_data[0].get("language", ["missing"])
-    except (requests.exceptions.HTTPError, ValueError):
-        language = ["missing"]
+    #     if not open_lib_data:
+    #         language = ["missing"]
+    #     else:
+    #         language = open_lib_data[0].get("language", ["missing"])
+    # except (requests.exceptions.HTTPError, ValueError):
+    #     language = ["missing"]
 
     # fetch summary using Google Gemini API
     prompt = f'Summarize the book "{title}" by {authors} in 5 sentences or less. If you don\'t know the book, return the word "missing" and only this word."'
@@ -92,7 +94,11 @@ def add_book(data):
         return jsonify({"error": "Unable to connect to Gemini"}), 500
 
     # create and add the new book
-    new_id = str(len(books) + 1)
+    #new_id = str(len(books) + 1)
+    global current_max_id
+    current_max_id += 1
+    new_id = str(current_max_id)
+
     new_book = Book(new_id, isbn, title, genre, authors, publisher, published_date, language, summary)
     books.append(new_book)
 
@@ -170,13 +176,22 @@ def update_book(book_id, updated_data):
 
 
 def delete_book(book_id):
-    global books, ratings
-    book = next((book for book in books if book.id == book_id), None)
-    if not book:
+    global books, ratings  
+
+    book_to_delete = None
+
+    for book in books:
+        if book.id == book_id:
+            book_to_delete = book
+            break
+
+    if not book_to_delete:
         return jsonify({"message": "Book not found"}), 404
-    
-    ratings = [r for r in ratings if r.id != book_id]
+
+
+
     books = [b for b in books if b.id != book_id]
+    ratings = [r for r in ratings if r.id != book_id]
 
     return jsonify({"id": book_id}), 200
 
