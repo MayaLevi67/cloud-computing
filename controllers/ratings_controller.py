@@ -1,3 +1,4 @@
+from collections import defaultdict
 from flask import jsonify
 from data.database import ratings
 from flask import jsonify, current_app as app
@@ -32,14 +33,25 @@ def add_rating(book_id, value):
 def get_top_books(ratings):
     try:
         app.logger.info(f"Total ratings: {len(ratings)}")
+
         eligible_books = [rating for rating in ratings if len(rating.values) >= 3]
         app.logger.info(f"Eligible books: {len(eligible_books)}")
 
         if not eligible_books:
             app.logger.info("No eligible books found with at least 3 ratings.")
+            return jsonify([])
 
-        sorted_books = sorted(eligible_books, key=lambda x: x.average, reverse=True)
-        sorted_books_dicts = [book.to_dict() for book in sorted_books]
+        rating_groups = defaultdict(list)
+        for book in eligible_books:
+            rating_groups[book.average].append(book)
+
+        top_ratings = sorted(rating_groups.keys(), reverse=True)[:3]
+
+        top_books = []
+        for rating in top_ratings:
+            top_books.extend(rating_groups[rating])
+
+        sorted_books_dicts = [book.to_dict() for book in top_books]
         app.logger.info('Top books calculated successfully.')
         return jsonify(sorted_books_dicts)
 
