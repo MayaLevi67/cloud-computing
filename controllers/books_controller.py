@@ -30,8 +30,7 @@ def add_book(data):
     if genre not in valid_genres:
         return jsonify({"error": "Invalid genre; acceptable genres are Fiction, Children, Biography, Science, Science Fiction, Fantasy, Other"}), 422
 
-    # Check if the book already exists
-    existing_book = next((book for book in books if book.ISBN == isbn), None)
+    existing_book = [book for book in books if book.ISBN == isbn]
     if existing_book:
         return jsonify({"error": "A book with this ISBN already exists"}), 422
 
@@ -48,31 +47,32 @@ def add_book(data):
 
     authors_list = google_books_data.get('authors', ["missing"])
     authors = " and ".join(authors_list)
+
     publisher = google_books_data.get("publisher", "missing")
+
     published_date = google_books_data.get("publishedDate", "missing")
     if published_date != "missing":
         valid_date_formats = [
-        r"^\d{4}$", # YYYY
-        r"^\d{4}-\d{2}-\d{2}$", # YYYY-MM-DD
+        r"^\d{4}$", #YYYY
+        r"^\d{4}-\d{2}-\d{2}$", #YYYY-MM-DD
     ]
     
     if not any(re.match(pattern, published_date) for pattern in valid_date_formats):
         published_date = "missing"
 
     # fetch data from OpenLibrary API
-    language = ["missing"]
-    # open_library_url = f'https://openlibrary.org/search.json?q={isbn}&fields=key,title,author_name,language'
-    # try:
-    #     open_lib_response = requests.get(open_library_url)
-    #     open_lib_response.raise_for_status()
-    #     open_lib_data = open_lib_response.json().get('docs', [])
+    open_library_url = f'https://openlibrary.org/search.json?q={isbn}&fields=key,title,author_name,language'
+    try:
+        open_lib_response = requests.get(open_library_url)
+        open_lib_response.raise_for_status()
+        open_lib_data = open_lib_response.json().get('docs', [])
         
-    #     if not open_lib_data:
-    #         language = ["missing"]
-    #     else:
-    #         language = open_lib_data[0].get("language", ["missing"])
-    # except (requests.exceptions.HTTPError, ValueError):
-    #     language = ["missing"]
+        if not open_lib_data:
+            language = ["missing"]
+        else:
+            language = open_lib_data[0].get("language", ["missing"])
+    except (requests.exceptions.HTTPError, ValueError):
+        language = ["missing"]
 
     # fetch summary using Google Gemini API
     prompt = f'Summarize the book "{title}" by {authors} in 5 sentences or less. If you don\'t know the book, return the word "missing" and only this word."'
@@ -90,11 +90,11 @@ def add_book(data):
 
         llm_response = model.generate_content(prompt)
         summary = llm_response.text if llm_response else "missing"
+    
     except Exception as e:
         return jsonify({"error": "Unable to connect to Gemini"}), 500
 
     # create and add the new book
-    #new_id = str(len(books) + 1)
     global current_max_id
     current_max_id += 1
     new_id = str(current_max_id)
@@ -108,11 +108,11 @@ def add_book(data):
 
 
 def get_book(book_id):
-    book = next((book for book in books if book.id == book_id), None)
-    if book:
-        return custom_jsonify(book.to_dict()), 200
-    else:
-        return custom_jsonify({"message": "Book not found"}), 404
+    for book in books:
+        if book.id == book_id:
+            return custom_jsonify(book.to_dict()), 200
+
+    return custom_jsonify({"message": "Book not found"}), 404
 
 
 def get_books(query_params):
@@ -123,15 +123,12 @@ def get_books(query_params):
         for key, value in query_params.items():
             if key == 'language':
                 if value not in valid_languages:
-                    return jsonify({"error": f"Invalid language request. Must be one of {list(valid_languages)}."}), 400
-                # Ensure that the language check works correctly with a list of languages
+                    return jsonify({"error": f"Invalid language request. Must be one of {list(valid_languages)}."}), 422
                 if not any(value.lower() == lang.lower() for lang in book.language):
                     matches_query = False
                     break
-            # Exclude 'summery' field from the query filtering as per instructions
             elif key == 'summery':
                 continue
-            # Generic handling for other fields
             elif str(getattr(book, key, '')).lower() != value.lower():
                 matches_query = False
                 break
@@ -141,7 +138,12 @@ def get_books(query_params):
 
 
 def update_book(book_id, updated_data):
-    book = next((book for book in books if book.id == book_id), None)
+    book = None
+    for b in books:
+        if b.id == book_id:
+            book = b
+            break
+
     if not book:
         return jsonify({"error": "Book not found"}), 404
     
@@ -149,16 +151,16 @@ def update_book(book_id, updated_data):
     if not all(field in updated_data for field in required_fields):
         return jsonify({"error": "All fields must be provided"}), 422
 
-    accepted_genres = ['Fiction', 'Children', 'Biography', 'Science', 'Science Fiction', 'Fantasy', 'Other']
-    if updated_data['genre'] not in accepted_genres:
+    valid_genres = ['Fiction', 'Children', 'Biography', 'Science', 'Science Fiction', 'Fantasy', 'Other']
+    if updated_data['genre'] not in valid_genres:
         return jsonify({"error": "Invalid genre; acceptable genres are Fiction, Children, Biography, Science, Science Fiction, Fantasy, Other"}), 422
     
     published_date = updated_data.get("publishedDate", "missing")
 
     if published_date != "missing":
         valid_date_formats = [
-            r"^\d{4}$",  # YYYY
-            r"^\d{4}-\d{2}-\d{2}$",  # YYYY-MM-DD
+            r"^\d{4}$", #YYYY
+            r"^\d{4}-\d{2}-\d{2}$", #YYYY-MM-DD
         ]
         
         if not any(re.match(pattern, published_date) for pattern in valid_date_formats):
@@ -187,8 +189,6 @@ def delete_book(book_id):
 
     if not book_to_delete:
         return jsonify({"message": "Book not found"}), 404
-
-
 
     books = [b for b in books if b.id != book_id]
     ratings = [r for r in ratings if r.id != book_id]

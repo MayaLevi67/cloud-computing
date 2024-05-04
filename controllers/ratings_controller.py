@@ -10,7 +10,13 @@ def get_ratings(query_id=None):
 
 
 def get_book_ratings(book_id):
-    rating_entry = next((rating for rating in ratings if rating.id == book_id), None)
+    rating_entry = None
+
+    for rating in ratings:
+        if rating.id == book_id:
+            rating_entry = rating
+            break
+
     if rating_entry:
         return jsonify(rating_entry.to_dict()), 200
     else:
@@ -18,12 +24,18 @@ def get_book_ratings(book_id):
     
 
 def add_rating(book_id, value):
-    rating_entry = next((rating for rating in ratings if rating.id == book_id), None)
+    rating_entry = None
+
+    for rating in ratings:
+        if rating.id == book_id:
+            rating_entry = rating
+            break
+
     if not rating_entry:
         return jsonify({"error": "Book not found"}), 404
 
     if value not in {1, 2, 3, 4, 5}:
-        return jsonify({"error": "Invalid rating value. Must be an integer between 1 and 5."}), 422
+        return jsonify({"error": "Invalid rating value. Must be an integer between 1 and 5"}), 422
 
     rating_entry.add_value(value)
 
@@ -32,13 +44,9 @@ def add_rating(book_id, value):
 
 def get_top_books(ratings):
     try:
-        app.logger.info(f"Total ratings: {len(ratings)}")
-
         eligible_books = [rating for rating in ratings if len(rating.values) >= 3]
-        app.logger.info(f"Eligible books: {len(eligible_books)}")
 
         if not eligible_books:
-            app.logger.info("No eligible books found with at least 3 ratings.")
             return jsonify([])
 
         rating_groups = defaultdict(list)
@@ -52,12 +60,9 @@ def get_top_books(ratings):
             top_books.extend(rating_groups[rating])
 
         sorted_books_dicts = [book.to_dict() for book in top_books]
-        app.logger.info('Top books calculated successfully.')
         return jsonify(sorted_books_dicts)
 
     except Exception as e:
-        app.logger.error(f"Failed to retrieve top books: {str(e)}")
-        raise
-
+        return jsonify({"error": "Failed to retrieve top books"})
 
 

@@ -10,7 +10,7 @@ def route_add_book():
     try:
         data = request.get_json()
     except:
-        return jsonify({"error": "Invalid JSON data."}), 422
+        return jsonify({"error": "Invalid JSON data"}), 422
     return add_book(data)
 
 @book_routes.route('/books/<book_id>', methods=['GET'])
@@ -28,7 +28,7 @@ def route_update_book(book_id):
     try:
         updated_data = request.get_json()
     except:
-        return jsonify({"error": "Invalid JSON data."}), 422
+        return jsonify({"error": "Invalid JSON data"}), 422
     return update_book(book_id, updated_data)
 
 @book_routes.route('/books/<book_id>', methods=['DELETE'])
