@@ -10,9 +10,9 @@ class Rating:
         self.average = sum(self.values) / len(self.values) if self.values else 0
 
     def to_dict(self):
-            return {
-                "id": self.id,
-                "title": self.title,
-                "values": self.values,
-                "average": self.average
-            }
+        return {
+            "id": self.id,
+            "title": self.title,
+            "values": self.values,
+            "average": self.average
+        }

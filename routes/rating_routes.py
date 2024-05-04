@@ -28,5 +28,4 @@ def top_books():
     try:
         return get_top_books(ratings)
     except Exception as e:
-        app.logger.error(f"Unhandled error in top_books: {str(e)}")
         return jsonify({'error': 'Internal Server Error', 'message': str(e)}), 500

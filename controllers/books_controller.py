@@ -1,7 +1,8 @@
 import re
 import requests
 from flask import jsonify
-from data.database import books, ratings
+from data.database import books
+from data.database import ratings
 from models.book import Book
 from models.rating import Rating
 from util.jsonify_tools import custom_jsonify
@@ -102,7 +103,8 @@ def add_book(data):
     new_book = Book(new_id, isbn, title, genre, authors, publisher, published_date, language, summary)
     books.append(new_book)
 
-    ratings.append(Rating(new_id, title))
+    new_rating = Rating(new_id, title)
+    ratings.append(new_rating)
 
     return jsonify({"id": new_id}), 201
 
@@ -178,20 +180,29 @@ def update_book(book_id, updated_data):
 
 
 def delete_book(book_id):
-    global books, ratings  
+    global books, ratings
 
-    book_to_delete = None
+    book_id = str(book_id)
+    book_found = False
+
+    new_books = []
+    new_ratings = []
 
     for book in books:
-        if book.id == book_id:
-            book_to_delete = book
-            break
+        if str(book.id) == book_id:
+            book_found = True
+        else:
+            new_books.append(book)
 
-    if not book_to_delete:
+    if not book_found:
         return jsonify({"message": "Book not found"}), 404
 
-    books = [b for b in books if b.id != book_id]
-    ratings = [r for r in ratings if r.id != book_id]
+    for rating in ratings:
+        if str(rating.id) != book_id:
+            new_ratings.append(rating)
+
+    books = new_books
+    ratings = new_ratings
 
     return jsonify({"id": book_id}), 200
 
