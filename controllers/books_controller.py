@@ -180,7 +180,8 @@ def update_book(book_id, updated_data):
 
 
 def delete_book(book_id):
-    global books, ratings
+    global books
+    global ratings
 
     book_id = str(book_id)
     book_found = False
